@@ -1,7 +1,7 @@
 //
 // CCSlider+Layout.swift
-// Control Centre Slider
-// https://www.github.com/joakimhellgren/ccslider
+// Control Center Slider
+// https://www.github.com/joakimhellgren/swiftui-control-center-slider
 // See LICENSE for license information.
 //
 
