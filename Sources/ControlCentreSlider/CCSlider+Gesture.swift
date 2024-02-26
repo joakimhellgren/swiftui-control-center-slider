@@ -1,14 +1,41 @@
 //
-//  File.swift
-//  
-//
-//  Created by Joakim Hellgren on 2024-02-26.
+// CCSlider+Gesture.swift
+// Control Centre Slider
+// https://www.github.com/joakimhellgren/ccslider
+// See LICENSE for license information.
 //
 
 import SwiftUI
 
 internal extension CCSlider {
-    var dragGesture: some Gesture {
+    var withoutLongPress: some Gesture {
+        LongPressGesture(minimumDuration: 0)
+            .onEnded { _ in previousHeight = currentHeight }
+            .sequenced(before: dragGesture)
+    }
+    
+    var withLongPress: some Gesture {
+        LongPressGesture(maximumDistance: 0.0)
+            .onChanged { _ in
+                withAnimation(.smooth(duration: 2.0)) {
+                    yScale = 0.9
+                }
+                
+                Task {
+                    try? await Task.sleep(for: .seconds(2))
+                    await UIImpactFeedbackGenerator().impactOccurred()
+                }
+            }
+            .onEnded { _ in
+                onLongPress!()
+                withAnimation(.snappy) {
+                    yScale = 1.0
+                }
+            }
+            .exclusively(before: withoutLongPress)
+    }
+    
+    private var dragGesture: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .local)
             .onChanged { dragChanged($0) }
             .onEnded{ dragEnded($0) }
@@ -17,23 +44,53 @@ internal extension CCSlider {
             }
     }
     
-    func dragChanged(_ gestureValue: DragGesture.Value) {
+    private func dragChanged(_ gestureValue: DragGesture.Value) {
         let startLocation = gestureValue.startLocation.y
         let currentLocation = gestureValue.location.y
-        
         let offset = startLocation + previousHeight - currentLocation
         
-        let spacing = step == nil ? 1.0 : fullHeight * CGFloat(step ?? .zero)
-        let nearest = CGFloat.findNearest(offset, within: 0.0...(fullHeight + spacing), spacing: spacing)
-        
-        let normalized = CGFloat.normalize(nearest, min: 0.0, max: fullHeight)
-        let clamped = min(max(0, normalized), 1)
-        
         animation = step == nil ? .none : .snappy
-        currentHeight = nearest
-        value = V(clamped)
+        currentHeight = adjustFrame(offset: offset)
+        withAnimation(.snappy) {
+            yScale = adjustScale(offset: offset)
+            value = adjustSliderValue()
+        }
+    }
+    
+    private func dragEnded(_ gestureValue: DragGesture.Value) {
+        let startLocation = gestureValue.startLocation.y
+        let endLocation = gestureValue.predictedEndLocation.y
+        let offset = startLocation - endLocation + previousHeight
         
+        currentHeight = adjustFrame(offset: offset)
+        previousHeight = currentHeight
+        animation = .snappy
+        withAnimation(.snappy) {
+            yScale = 1.0
+            value = adjustSliderValue()
+        }
+    }
+    
+    private func adjustSliderValue() -> V {
+        let normalized = CGFloat.normalize(currentHeight, min: 0.0, max: fullHeight)
+        return min(max(bounds.lowerBound, V(normalized)), bounds.upperBound)
+    }
+    
+    private func adjustFrame(offset: CGFloat) -> CGFloat {
+        let spacing = step == nil ? 1.0 : fullHeight * CGFloat(step ?? .zero)
+        let nearest: CGFloat
+        if (atMax || atMin) && step == nil {
+            nearest = CGFloat.adjustToRange(offset, within: 0.0...fullHeight)
+        } else {
+            nearest = CGFloat.findNearest(offset, within: 0.0...(fullHeight + spacing), spacing: spacing)
+        }
+        
+        return nearest
+    }
+    
+    private func adjustScale(offset: CGFloat) -> CGFloat {
         var overflow: CGFloat?
+        
         if offset > fullHeight {
             overflow = offset - fullHeight
         } else if offset < .zero {
@@ -41,38 +98,11 @@ internal extension CCSlider {
         }
         
         guard let overflow else {
-            withAnimation(.snappy) {
-                yScale = 1.0
-            }
-            
-            return
+            return 1.0
         }
         
         let scale = min(1.05, 1 + (0.0001 * overflow))
-        yScale = scale
-    }
-    
-    func dragEnded(_ gestureValue: DragGesture.Value) {
-        let startLocation = gestureValue.startLocation.y
-        let endLocation = gestureValue.predictedEndLocation.y
-        
-        let offset = startLocation - endLocation + previousHeight
-        let spacing = step == nil ? 1.0 : fullHeight * CGFloat(step ?? .zero)
-        
-        let nearest = CGFloat.findNearest(offset, within: 0.0...(fullHeight + spacing), spacing: spacing)
-        
-        let normalized = CGFloat.normalize(nearest, min: 0.0, max: fullHeight + spacing)
-        let clamped = min(max(0, normalized), 1)
-        
-        currentHeight = nearest
-        previousHeight = currentHeight
-        
-        animation = .snappy
-        
-        withAnimation(.snappy) {
-            yScale = 1.0
-            value = V(clamped)
-        }
+        return scale
     }
 }
 

@@ -1,9 +1,10 @@
 //
-//  File.swift
-//  
+// CCSlider+Layout.swift
+// Control Centre Slider
+// https://www.github.com/joakimhellgren/ccslider
+// See LICENSE for license information.
 //
-//  Created by Joakim Hellgren on 2024-02-26.
-//
+
 
 import SwiftUI
 
@@ -15,9 +16,11 @@ internal extension CCSlider {
     var atMax: Bool { value >= bounds.upperBound }
     var atMin: Bool { value <= bounds.lowerBound }
     
-    func layout(in frame: CGRect) {
-        fullHeight = frame.height
-        currentHeight = frame.height * CGFloat(value)
-        previousHeight = currentHeight
+    func layout(in frame: CGRect, animated: Bool = true) {
+        withAnimation(animated ? animation : nil) {
+            fullHeight = frame.height
+            currentHeight = frame.height * CGFloat(value)
+            previousHeight = currentHeight
+        }
     }
 }
