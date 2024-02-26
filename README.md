@@ -28,7 +28,7 @@ import ControlCenterSlider
 
 @State var value = 0.5
 ...
-CCSlider($value)
+CCSlider(value: $value)
 ```
 
 ```swift
